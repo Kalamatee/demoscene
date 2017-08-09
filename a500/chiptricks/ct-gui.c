@@ -1,7 +1,7 @@
 #include "ct-gui.h"
 #include "gfx.h"
 #include "mouse.h"
-#include "bltop.h"
+#include "blitter.h"
 
 static inline void PushGuiEvent(WidgetT *wg, WORD event) {
   GuiEventT ev = { EV_GUI, event, wg };
@@ -20,10 +20,11 @@ static void GroupRedraw(GuiStateT *gui, GroupT *wg) {
 
 static void LabelRedraw(GuiStateT *gui, LabelT *wg) {
   Area2D area = { wg->area.x, wg->area.y + 1, wg->area.w, wg->area.h };
+  FontDrawCtxT ctx = { gui->font, gui->screen, &area, 2 };
 
   Log("LabelRedraw: '%s'\n", wg->text);
   BitmapSetArea(gui->screen, &wg->area, 8);
-  DrawText(&area, wg->text);
+  DrawText(&ctx, wg->text);
 }
 
 static void ButtonRedraw(GuiStateT *gui, ButtonT *wg) {
@@ -174,7 +175,6 @@ void GuiInit(GuiStateT *gui, BitmapT *screen, FontT *font) {
 }
 
 void GuiRedraw(GuiStateT *gui) {
-  DrawTextSetup(gui->screen, 0, gui->font);
   GuiWidgetRedraw(gui, gui->root);
 }
 

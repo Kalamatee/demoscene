@@ -100,13 +100,15 @@ static void SwitchModule(WORD new) {
   if (AhxInitModule(module[active].data) == 0)
     AhxInitSubSong(0, 0);
 
-  // BitmapClear(scroll, 3);
-  DrawTextSetup(scroll, 0, big_font);
-  DrawText(MAKE(Area2D, 0, 1, WIDTH, 13), artwork->info[active].note);
+  {
+    FontDrawCtxT ctx = {big_font, scroll, (&(Area2D){0, 1, WIDTH, 13}), 0};
+    
+    // BitmapClear(scroll, 3);
+    DrawText(&ctx, artwork->info[active].note);
 
-  _info->label.text = artwork->info[active].author;
-  DrawTextSetup(gui->screen, 0, gui->font);
-  GuiWidgetRedraw(gui, _info);
+    _info->label.text = artwork->info[active].author;
+    GuiWidgetRedraw(gui, _info);
+  }
 }
 
 static void AhxSetTempo(UWORD tempo asm("d0"));
