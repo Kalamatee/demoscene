@@ -4,36 +4,35 @@ SOURCES_C := \
 	ct-load.c \
 	ct-scope.c
 
-DATA := 'data/01. Chip Shop (4-Mat) - Elektro.ahx' \
-	'data/02. Cyber Ride (Jester) - KAM_.ahx' \
-	'data/02. Cyber Ride (Jester) - KAM_.txt' \
-	'data/03. Delicate 0ooz! (Emax) - KAM_.ahx' \
-	'data/03. Delicate 0ooz! (Emax) - KAM_.txt' \
-	'data/04. Enigma (Firefox & Tip) - Jazzcat.ahx' \
-	'data/05. Gratitude (Dime) - Varthall.ahx' \
-	'data/05. Gratitude (Dime) - Varthall.txt' \
-	'data/06. Lotus III Ingame 5 (Patrick Phelan) - KAM_.ahx' \
-	'data/06. Lotus III Ingame 5 (Patrick Phelan) - KAM_.txt' \
-	'data/07. Madness2 - Part B (4-Mat) - Mice.ahx' \
-	'data/07. Madness2 - Part B (4-Mat) - Mice.txt' \
-	'data/08. Phantasmagoria (4-Mat) - Jazzcat.ahx' \
-	'data/09. Pinball Illusions Title (Blaizer) - KAM_.ahx' \
-	'data/09. Pinball Illusions Title (Blaizer) - KAM_.txt' \
-	'data/10. Ride (XTD) - KAM_.thx' \
-	'data/11. Shattere (Hollywood & Reverse) - Mice.ahx' \
-	'data/11. Shattere (Hollywood & Reverse) - Mice.txt' \
-	'data/12. Switchback (Chromag) - KAM_.ahx' \
-	'data/12. Switchback (Chromag) - KAM_.txt' \
-	'data/ahxWaves' \
-	'data/ahxWaves.Location' \
-	'data/ct-6x9.font' \
-	'data/ct-all.json' \
-	'data/ct_font.ilbm' \
-	'data/ct_panel.ilbm' \
-	'data/ct_pointer.ilbm' \
-	'data/ct_track_active.ilbm' \
-	'data/ct_track_hover.ilbm' \
-	'data/ct_track_inactive.ilbm'
+DATA := data/01-chipshop.ahx \
+        data/02-cyberride.ahx \
+        data/03-delicate.ahx \
+        data/04-enigma.ahx \
+        data/05-gratitude.ahx \
+        data/06-lotus3.ahx \
+        data/07-madness2.ahx \
+        data/08-phantasmagoria.ahx \
+        data/09-pinball.ahx \
+        data/10-ride.thx \
+        data/11-shattere.ahx \
+        data/12-switchback.ahx \
+        data/ahxWaves \
+        data/ahxWaves.Location \
+        data/ct-big.font \
+        data/ct-modules.dat \
+        data/ct-small.font \
+        data/ct_big_font.ilbm \
+        data/ct_panel.ilbm \
+        data/ct_pointer.ilbm \
+        data/ct_small_font.ilbm \
+        data/ct_spans.ilbm \
+        data/ct_track_active.ilbm \
+        data/ct_track_hover.ilbm \
+        data/ct_track_inactive.ilbm \
+        data/ct_track_pause.ilbm \
+        data/ct_track_pause_hover.ilbm \
+        data/ct_track_play.ilbm \
+        data/ct_track_play_hover.ilbm
 
 LIBS = libahx
 
@@ -42,7 +41,7 @@ all: build-data chiptricks.exe
 include build.mk
 
 archive:
-	7z a "chiptricks-$$(date +%F-%H%M).7z" $< $(DATA)
+	7z a "chiptricks-$$(date +%F-%H%M).7z" chiptricks.exe $(DATA)
 
 clean:: clean-data
 
