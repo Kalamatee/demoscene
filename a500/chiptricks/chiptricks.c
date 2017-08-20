@@ -178,7 +178,7 @@ static __interrupt LONG AhxPlayerIntHandler() {
   return 0;
 }
 
-INTERRUPT(AhxPlayerInterrupt, 10, AhxPlayerIntHandler);
+INTERRUPT(AhxPlayerInterrupt, 10, AhxPlayerIntHandler, NULL);
 
 static void AhxSetTempo(UWORD tempo asm("d0")) {
   ciaa->ciatalo = tempo & 0xff;
@@ -199,13 +199,13 @@ static void Init() {
 
     for (y = 0; y < SCROLL_Y; y++) {
       if ((y == LABEL_Y + i * 10) && (i < MODULES)) {
-        CopWait(cp, Y(y), X(0));
+        CopWaitSafe(cp, Y(y), X(0));
         module[i].bgcol = CopSetRGB(cp, COLOR, (i & 1) ? 0x311 : 0x411);
         i++;
       }
     }
   }
-  CopWait(cp, Y(SCROLL_Y), 0);
+  CopWaitSafe(cp, Y(SCROLL_Y), 0);
   CopMove32(cp, bplpt[0], screen->planes[0] + SCROLL_Y * WIDTH / 8);
   CopMove32(cp, bplpt[1], scroll->planes[0]);
   CopMove32(cp, bplpt[2], screen->planes[1] + SCROLL_Y * WIDTH / 8);
@@ -221,7 +221,7 @@ static void Init() {
 
   CopListActivate(cp);
 
-  custom->dmacon = DMAF_SETCLR | DMAF_RASTER | DMAF_BLITTER | DMAF_SPRITE;
+  EnableDMA(DMAF_RASTER | DMAF_BLITTER | DMAF_SPRITE);
 
   KeyboardInit();
   MouseInit(0, 0, WIDTH - 1, HEIGHT - 1);
@@ -240,7 +240,7 @@ static void Init() {
   if (AhxInitHardware((APTR)AhxSetTempo, AHX_KILL_SYSTEM))
     exit(10);
 
-  AddIntServer(INTB_PORTS, &AhxPlayerInterrupt);
+  AddIntServer(INTB_PORTS, AhxPlayerInterrupt);
 
   {
     GuiEventT ev = { EV_GUI, WA_RELEASED, _b00 };
@@ -251,9 +251,9 @@ static void Init() {
 }
 
 static void Kill() {
-  custom->dmacon = DMAF_RASTER | DMAF_BLITTER | DMAF_SPRITE;
+  DisableDMA(DMAF_RASTER | DMAF_BLITTER | DMAF_SPRITE);
 
-  RemIntServer(INTB_PORTS, &AhxPlayerInterrupt);
+  RemIntServer(INTB_PORTS, AhxPlayerInterrupt);
 
   AhxStopSong();
   AhxKillHardware();
