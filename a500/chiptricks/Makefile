@@ -34,7 +34,7 @@ DATA := data/01-chipshop.ahx \
         data/ct_track_play.ilbm \
         data/ct_track_play_hover.ilbm
 
-LIBS = libahx
+LIBS = libahx libgui libblit libgfx 
 
 all: build-data chiptricks.exe
 
