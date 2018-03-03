@@ -1,3 +1,4 @@
+#include "blitter.h"
 #include "memory.h"
 #include "ilbm.h"
 #include "ct-scope.h"
@@ -38,7 +39,7 @@ WaveScopeT *NewWaveScope(char *spans) {
     }
   }
 
-  ws->spans = LoadILBMCustom(spans, 0);
+  ws->spans = LoadILBMCustom(spans, BM_DISPLAYABLE);
 
   return ws;
 }
@@ -68,10 +69,10 @@ void WaveScopeUpdateChannel(WaveScopeT *ws, WORD num, AhxVoiceTempT *voice) {
 }
 
 void WaveScopeDrawChannel(WaveScopeT *ws, WORD num,
-                          BitmapT *bm, WORD x, WORD y) 
+                          BitmapT *dst, WORD x, WORD y) 
 {
   WaveScopeChanT *ch = &ws->channel[num];
-  LONG dstoff = ((x & ~15) >> 3) + y * bm->bytesPerRow;
+  LONG dststart = ((x & ~15) >> 3) + (WORD)y * (WORD)dst->bytesPerRow;
   UBYTE *samples = ch->samples;
   UBYTE *multab = ws->multab;
   LONG volume = ch->volume << 8;
@@ -79,8 +80,20 @@ void WaveScopeDrawChannel(WaveScopeT *ws, WORD num,
   LONG di = ch->di;
   WORD n;
 
+  BitmapT *src = ws->spans;
+  UWORD bltsize = (src->depth << 6) | (src->bytesPerRow >> 1);
+
+  WaitBlitter();
+
+  custom->bltalwm = -1;
+  custom->bltafwm = -1;
+  custom->bltamod = src->bplSize - src->bytesPerRow;
+  custom->bltdmod = dst->bplSize - src->bytesPerRow;
+  custom->bltcon0 = (SRCA | DEST | A_TO_D);
+  custom->bltcon1 = 0;
+
   for (n = 0; n < WS_SAMPLES; n++) {
-    WORD x;
+    LONG x;
 
     i = swap16(i);
     x = multab[samples[i] | volume] >> 4;
@@ -91,18 +104,19 @@ void WaveScopeDrawChannel(WaveScopeT *ws, WORD num,
       i -= (AHX_SAMPLE_LEN << 16);
 
     {
-      APTR *src = ws->spans->planes;
-      APTR *dst = bm->planes;
-      LONG srcoff = x * ws->spans->bytesPerRow;
-      WORD k;
+      LONG srcstart = (WORD)x * (WORD)src->bytesPerRow;
+      APTR srcbpt = src->planes[0] + srcstart;
+      APTR dstbpt = dst->planes[0] + dststart;
 
-      for (k = 0; k < bm->depth; k++)
-        *(LONG *)(dst[k] + dstoff) = *(LONG *)(src[k] + srcoff);
+      WaitBlitter();
+
+      custom->bltapt = srcbpt;
+      custom->bltdpt = dstbpt;
+      custom->bltsize = bltsize;
     }
 
-    dstoff += bm->bytesPerRow;
+    dststart += dst->bytesPerRow;
   }
 
   ch->i = i;
 }
-
