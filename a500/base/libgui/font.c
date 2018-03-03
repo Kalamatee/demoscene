@@ -40,7 +40,13 @@ __regargs void DrawTextN(FontDrawCtxT *ctx, UBYTE *text, UWORD n) {
         if (!src.w)
           continue;
 
-        BlitterCopyArea(ctx->bm, ctx->bpl, sx + x, sy + y, font->data, 0, &src);
+        BlitterCopyAreaSetup(ctx->bm, sx + x, sy + y, font->data, &src);
+        {
+          WORD b;
+
+          for (b = 0; b < font->data->depth; b++)
+            BlitterCopyAreaStart(ctx->bpl + b, b);
+        }
         x += src.w;
       }
     }

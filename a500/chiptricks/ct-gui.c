@@ -20,7 +20,7 @@ static void GroupRedraw(GuiStateT *gui, GroupT *wg) {
 
 static void LabelRedraw(GuiStateT *gui, LabelT *wg) {
   Area2D area = { wg->area.x, wg->area.y + 1, wg->area.w, wg->area.h };
-  FontDrawCtxT ctx = { gui->font, gui->screen, &area, 2 };
+  FontDrawCtxT ctx = { gui->font, gui->screen, &area, 0 };
 
   Log("LabelRedraw: '%s'\n", wg->text);
   BitmapSetArea(gui->screen, &wg->area, 8);
