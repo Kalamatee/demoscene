@@ -13,32 +13,22 @@
 #include "fx.h"
 #include "blitter.h"
 #include "color.h"
+#include "chiptricks.h"
 #include "ct-gui.h"
 #include "ct-scope.h"
+#include "ct-scroll.h"
 #include "ct-load.h"
-
-#define WIDTH 320
-#define HEIGHT 256
-#define DEPTH 5
-
-#define SCOPE_X 224
-#define SCOPE_Y 8
-
-#define COLOR 8
-#define LABEL_Y 34
-#define SCROLL_Y 241
-#define SCROLL_H 15
 
 STRPTR __cwdpath = "chiptrick";
 LONG __chipmem = 250 * 1024;
 LONG __fastmem = 450 * 1024;
 
-static BitmapT *screen, *scroll, *trkselbt[3];
+static BitmapT *screen, *trkselbt[3];
 static FontT *small_font, *big_font;
 static SpriteT *pointer;
 static CopInsT *sprptr[8];
+static CopInsT *scrollptr[3];
 static CopListT *cp;
-static WaveScopeT *wavescope;
 
 static GUI_RADIOBT(_b00, 5,  36, 7, 7);
 static GUI_RADIOBT(_b01, 5,  46, 7, 7);
@@ -79,39 +69,61 @@ static GUI_LABEL(_info, 208, 83, 80, 80);
 static GUI_GROUP(_root, _track_bt, _track_lb, _info);
 static GUI_MAIN(_root);
 
-#define MODULES 12
-
 static ArtworkT *artwork;
 
 static struct {
   APTR data;
-  CopInsT *bgcol;
+  CopInsT *bgcol[10];
 } module[MODULES];
 
 static WORD active = 0;
 
+static void SetModuleTitleBgCol(WORD i, UWORD color) {
+  CopInsT **insptr = module[i].bgcol;
+  CopInsSet16(*insptr++, color);
+  CopInsSet16(*insptr++, color);
+  CopInsSet16(*insptr++, color);
+  CopInsSet16(*insptr++, color);
+  CopInsSet16(*insptr++, color);
+  CopInsSet16(*insptr++, color);
+  CopInsSet16(*insptr++, color);
+  CopInsSet16(*insptr++, color);
+  CopInsSet16(*insptr++, color);
+  CopInsSet16(*insptr++, color);
+}
+
 static void SwitchModule(WORD new) {
   AhxStopSong();
 
-  CopInsSet16(module[active].bgcol, (active & 1) ? 0x311 : 0x411);
+  SetModuleTitleBgCol(active, (active & 1) ? 0x311 : 0x411);
 
   active = new;
 
   if (AhxInitModule(module[active].data) == 0)
     AhxInitSubSong(0, 0);
 
-  {
-    FontDrawCtxT ctx = {big_font, scroll, (&(Area2D){0, 1, WIDTH, 13}), 0};
-    
-    // BitmapClear(scroll, 3);
-    DrawText(&ctx, artwork->info[active].note);
+  ScrollReset(artwork->info[active].note);
 
-    _info->label.text = artwork->info[active].author;
-    GuiWidgetRedraw(gui, _info);
+  _info->label.text = artwork->info[active].author;
+  GuiWidgetRedraw(gui, _info);
+}
+
+static void LoadModules(void) {
+  WORD i;
+
+  for (i = 0; i < MODULES; i++) {
+    module[i].data = LoadFile(artwork->info[i].filename, MEMF_PUBLIC);
+    BUTTON(GROUP(_track_bt)->widgets[i])->images = trkselbt;
+    LABEL(GROUP(_track_lb)->widgets[i])->text = artwork->info[i].title;
+    // LABEL(GROUP(_track_lb)->widgets[i])->length = strlen(artwork->info[i].title);
   }
 }
 
-static void AhxSetTempo(UWORD tempo asm("d0"));
+static void LoadMousePointer(void) {
+  BitmapT *bm = LoadILBMCustom("ct_pointer.ilbm", 0);
+  pointer = NewSpriteFromBitmap(16, bm, 0, 0);
+  DeleteBitmap(bm);
+}
 
 static void Load() {
   if (AhxInitPlayer(AHX_LOAD_WAVES_FILE, AHX_FILTERS))
@@ -125,39 +137,23 @@ static void Load() {
   small_font = LoadFont("ct-small.font");
   big_font = LoadFont("ct-big.font");
 
-  scroll = NewBitmapCustom(WIDTH, HEIGHT - SCROLL_Y + 1, 3,
-                           BM_DISPLAYABLE|BM_CLEAR);
+  LoadMousePointer();
+  LoadModules();
+  WaveScopeInit("ct_spans.ilbm");
+}
 
-  {
-    WORD i;
+static void UnLoadModules(void) {
+  WORD i;
 
-    for (i = 0; i < MODULES; i++) {
-      module[i].data = LoadFile(artwork->info[i].filename, MEMF_PUBLIC);
-      BUTTON(GROUP(_track_bt)->widgets[i])->images = trkselbt;
-      LABEL(GROUP(_track_lb)->widgets[i])->text = artwork->info[i].title;
-      // LABEL(GROUP(_track_lb)->widgets[i])->length = strlen(artwork->info[i].title);
-    }
-  }
-
-  {
-    BitmapT *bm = LoadILBMCustom("ct_pointer.ilbm", 0);
-    pointer = NewSpriteFromBitmap(16, bm, 0, 0);
-    DeleteBitmap(bm);
-  }
-
-  wavescope = NewWaveScope("ct_spans.ilbm");
+  for (i = 0; i < MODULES; i++)
+    MemFree(module[i].data);
 }
 
 static void UnLoad() {
-  {
-    WORD i;
-
-    for (i = 0; i < MODULES; i++)
-      MemFree(module[i].data);
-  }
+  UnLoadModules();
+  WaveScopeKill();
 
   DeletePalette(screen->palette);
-  DeleteBitmap(scroll);
   DeleteBitmap(screen);
   DeleteBitmap(trkselbt[0]);
   DeleteBitmap(trkselbt[1]);
@@ -165,7 +161,6 @@ static void UnLoad() {
 
   DeleteFont(small_font);
   DeleteFont(big_font);
-  DeleteWaveScope(wavescope);
 
   AhxKillPlayer();
 }
@@ -186,8 +181,28 @@ static void AhxSetTempo(UWORD tempo asm("d0")) {
   ciaa->ciacra |= CIACRAF_START;
 }
 
+static void AhxStartPlayer(void) {
+  /* Enable only CIA Timer A interrupt. */
+  ciaa->ciaicr = (UBYTE)(~CIAICRF_SETCLR);
+  ciaa->ciaicr = CIAICRF_SETCLR | CIAICRF_TA;
+  /* Run CIA Timer A in continuous / normal mode, increment every 10 cycles. */
+  ciaa->ciacra &= (UBYTE)(~CIACRAF_RUNMODE & ~CIACRAF_INMODE & ~CIACRAF_PBON);
+
+  if (AhxInitHardware((APTR)AhxSetTempo, AHX_KILL_SYSTEM))
+    exit(10);
+
+  AddIntServer(INTB_PORTS, AhxPlayerInterrupt);
+}
+
+static void AhxStopPlayer(void) {
+  RemIntServer(INTB_PORTS, AhxPlayerInterrupt);
+
+  AhxStopSong();
+  AhxKillHardware();
+}
+
 static void Init() {
-  cp = NewCopList(1000);
+  cp = NewCopList(200 + MODULES * 10 * 5);
 
   CopInit(cp);
   CopSetupGfxSimple(cp, MODE_LORES, DEPTH, X(0), Y(0), WIDTH, HEIGHT);
@@ -195,25 +210,30 @@ static void Init() {
   CopSetupSprites(cp, sprptr);
   CopLoadPal(cp, screen->palette, 0);
   {
-    WORD y, i = 0;
+    WORD y, k, i = 0;
 
     for (y = 0; y < SCROLL_Y; y++) {
       if ((y == LABEL_Y + i * 10) && (i < MODULES)) {
-        CopWaitSafe(cp, Y(y), X(0));
-        module[i].bgcol = CopSetRGB(cp, COLOR, (i & 1) ? 0x311 : 0x411);
+        for (k = 0; k < 10; k++) {
+          CopWaitSafe(cp, Y(y + k), X(0) / 2);
+          module[i].bgcol[k] = CopSetRGB(cp, COLOR, (i & 1) ? 0x311 : 0x411);
+          CopWaitSafe(cp, Y(y + k), X(160) / 2);
+          CopSetRGB(cp, COLOR, (i & 1) ? 0x311 : 0x411);
+        }
         i++;
       }
     }
   }
   CopWaitSafe(cp, Y(SCROLL_Y), 0);
   CopMove32(cp, bplpt[0], screen->planes[0] + SCROLL_Y * WIDTH / 8);
-  CopMove32(cp, bplpt[1], scroll->planes[0]);
+  scrollptr[0] = CopMove32(cp, bplpt[1], NULL);
   CopMove32(cp, bplpt[2], screen->planes[1] + SCROLL_Y * WIDTH / 8);
-  CopMove32(cp, bplpt[3], scroll->planes[1]);
+  scrollptr[1] = CopMove32(cp, bplpt[3], NULL);
   CopMove32(cp, bplpt[4], screen->planes[2] + SCROLL_Y * WIDTH / 8);
-  CopMove32(cp, bplpt[5], scroll->planes[2]);
+  scrollptr[2] = CopMove32(cp, bplpt[5], NULL); 
   CopMove16(cp, bplcon0, 
             BPLCON0_BPU(6) | BPLCON0_COLOR | MODE_LORES | MODE_DUALPF);
+  CopMove16(cp, bpl2mod, 2);
   CopEnd(cp);
 
   CopInsSet32(sprptr[0], pointer->data);
@@ -225,22 +245,14 @@ static void Init() {
 
   KeyboardInit();
   MouseInit(0, 0, WIDTH - 1, HEIGHT - 1);
+  ScrollInit(big_font, scrollptr);
 
   GuiInit(gui, screen, small_font);
   GuiRedraw(gui);
 
   BitmapClearArea(screen, STRUCT(Area2D, SCOPE_X, SCOPE_Y, 64, 64));
 
-  /* Enable only CIA Timer A interrupt. */
-  ciaa->ciaicr = (UBYTE)(~CIAICRF_SETCLR);
-  ciaa->ciaicr = CIAICRF_SETCLR | CIAICRF_TA;
-  /* Run CIA Timer A in continuous / normal mode, increment every 10 cycles. */
-  ciaa->ciacra &= (UBYTE)(~CIACRAF_RUNMODE & ~CIACRAF_INMODE & ~CIACRAF_PBON);
-
-  if (AhxInitHardware((APTR)AhxSetTempo, AHX_KILL_SYSTEM))
-    exit(10);
-
-  AddIntServer(INTB_PORTS, AhxPlayerInterrupt);
+  AhxStartPlayer();
 
   {
     GuiEventT ev = { EV_GUI, WA_RELEASED, _b00 };
@@ -253,11 +265,8 @@ static void Init() {
 static void Kill() {
   DisableDMA(DMAF_RASTER | DMAF_BLITTER | DMAF_SPRITE);
 
-  RemIntServer(INTB_PORTS, AhxPlayerInterrupt);
-
-  AhxStopSong();
-  AhxKillHardware();
-
+  ScrollKill();
+  AhxStopPlayer();
   KeyboardKill();
   MouseKill();
 
@@ -294,10 +303,9 @@ static BOOL HandleEvent() {
   return TRUE;
 }
 
-static void Render() {
+static void HighlightModuleTitle(void) {
   WORD xo = normfx(SIN(frameCount * 32) * 8) + 8;
   WORD c0, c1;
-  WORD i;
 
   if (active & 1)
     c0 = 0x311, c1 = 0xa44;
@@ -307,15 +315,25 @@ static void Render() {
   if (xo > 15)
     xo = 15;
 
-  CopInsSet16(module[active].bgcol, ColorTransition(c0, c1, xo));
+  SetModuleTitleBgCol(active, ColorTransition(c0, c1, xo));
+}
 
-  for (i = 0; i < 4; i++)
-    WaveScopeUpdateChannel(wavescope, i, &Ahx.Public->VoiceTemp[i]);
+#define WS_REDRAW(i, x, y)                      \
+  WaveScopeUpdateChannel(i);                    \
+  WaveScopeDrawChannel((i), screen, (x), (y));
 
-  WaveScopeDrawChannel(wavescope, 0, screen, SCOPE_X, SCOPE_Y);
-  WaveScopeDrawChannel(wavescope, 1, screen, SCOPE_X + 32, SCOPE_Y);
-  WaveScopeDrawChannel(wavescope, 2, screen, SCOPE_X, SCOPE_Y + 32);
-  WaveScopeDrawChannel(wavescope, 3, screen, SCOPE_X + 32, SCOPE_Y + 32);
+static void Render() {
+  LONG lines = ReadLineCounter();
+
+  HighlightModuleTitle();
+  ScrollRender(frameCount);
+
+  WS_REDRAW(0, SCOPE_X, SCOPE_Y);
+  WS_REDRAW(1, SCOPE_X + 32, SCOPE_Y);
+  WS_REDRAW(2, SCOPE_X, SCOPE_Y + 32);
+  WS_REDRAW(3, SCOPE_X + 32, SCOPE_Y + 32);
+
+  Log("render: %ld\n", ReadLineCounter() - lines);
 }
 
 EffectT Effect = { Load, UnLoad, Init, Kill, Render, HandleEvent };

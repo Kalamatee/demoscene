@@ -1,3 +1,4 @@
+#include "ahx.h"
 #include "blitter.h"
 #include "memory.h"
 #include "ilbm.h"
@@ -12,45 +13,37 @@ typedef struct {
 #define TICKS_PER_FRAME (3579546L / 50)
 #define WS_SAMPLES 32
 
-struct WaveScope {
-  WaveScopeChanT channel[4];
-  BitmapT *spans;
-  UBYTE multab[256*64];
-};
+static WaveScopeChanT channel[4];
+static BitmapT *spans;
+static UBYTE multab[256*64];
 
-WaveScopeT *NewWaveScope(char *spans) {
-  WaveScopeT *ws = MemAlloc(sizeof(WaveScopeT), MEMF_PUBLIC);
+void WaveScopeInit(char *image) {
   WORD i, j;
-
-  for (i = 0; i < 4; i++)
-    memset(&ws->channel[i], 0, sizeof(WaveScopeChanT));
 
   for (i = 0; i < 64; i++) {
     for (j = 0; j < 128; j++) {
       WORD index = (i << 8) | j;
-      WORD x = (j * (i + 1)) >> 4;
-      ws->multab[index] = x;
+      WORD x = ((WORD)j * (WORD)(i + 1)) >> 4;
+      multab[index] = x;
     }
 
     for (; j < 255; j++) {
       WORD index = (i << 8) | j;
-      WORD x = ((255 - j) * (i + 1)) >> 4;
-      ws->multab[index] = x;
+      WORD x = ((WORD)(255 - j) * (WORD)(i + 1)) >> 4;
+      multab[index] = x;
     }
   }
 
-  ws->spans = LoadILBMCustom(spans, BM_DISPLAYABLE);
-
-  return ws;
+  spans = LoadILBMCustom(image, BM_DISPLAYABLE);
 }
 
-void DeleteWaveScope(WaveScopeT *ws) {
-  DeleteBitmap(ws->spans);
-  MemFree(ws);
+void WaveScopeKill(void) {
+  DeleteBitmap(spans);
 }
 
-void WaveScopeUpdateChannel(WaveScopeT *ws, WORD num, AhxVoiceTempT *voice) {
-  WaveScopeChanT *ch = &ws->channel[num];
+void WaveScopeUpdateChannel(WORD num) {
+  AhxVoiceTempT *voice = &Ahx.Public->VoiceTemp[num];
+  WaveScopeChanT *ch = &channel[num];
   LONG samplesPerFrame = 1;
 
   if (voice->AudioPeriod)
@@ -68,19 +61,16 @@ void WaveScopeUpdateChannel(WaveScopeT *ws, WORD num, AhxVoiceTempT *voice) {
     ch->i = 0;
 }
 
-void WaveScopeDrawChannel(WaveScopeT *ws, WORD num,
-                          BitmapT *dst, WORD x, WORD y) 
-{
-  WaveScopeChanT *ch = &ws->channel[num];
+void WaveScopeDrawChannel(WORD num, BitmapT *dst, WORD x, WORD y) {
+  WaveScopeChanT *ch = &channel[num];
   LONG dststart = ((x & ~15) >> 3) + (WORD)y * (WORD)dst->bytesPerRow;
   UBYTE *samples = ch->samples;
-  UBYTE *multab = ws->multab;
   LONG volume = ch->volume << 8;
   LONG i = ch->i;
   LONG di = ch->di;
   WORD n;
 
-  BitmapT *src = ws->spans;
+  BitmapT *src = spans;
   UWORD bltsize = (src->depth << 6) | (src->bytesPerRow >> 1);
 
   WaitBlitter();
@@ -104,7 +94,7 @@ void WaveScopeDrawChannel(WaveScopeT *ws, WORD num,
       i -= (AHX_SAMPLE_LEN << 16);
 
     {
-      LONG srcstart = (WORD)x * (WORD)src->bytesPerRow;
+      LONG srcstart = x << 2; // (WORD)x * (WORD)src->bytesPerRow;
       APTR srcbpt = src->planes[0] + srcstart;
       APTR dstbpt = dst->planes[0] + dststart;
 

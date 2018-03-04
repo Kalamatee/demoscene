@@ -2,7 +2,8 @@ SOURCES_C := \
 	chiptricks.c \
 	ct-gui.c \
 	ct-load.c \
-	ct-scope.c
+	ct-scope.c \
+        ct-scroll.c
 
 DATA := data/01-chipshop.ahx \
         data/02-cyberride.ahx \

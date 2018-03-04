@@ -3,14 +3,10 @@
 
 #include "common.h"
 #include "gfx.h"
-#include "ahx.h"
 
-typedef struct WaveScope WaveScopeT;
-
-WaveScopeT *NewWaveScope(char *spans);
-void DeleteWaveScope(WaveScopeT *ws);
-void WaveScopeUpdateChannel(WaveScopeT *ws, WORD num, AhxVoiceTempT *voice);
-void WaveScopeDrawChannel(WaveScopeT *ws, WORD num,
-                          BitmapT *bm, WORD x, WORD y);
+void WaveScopeInit(char *spans);
+void WaveScopeKill(void);
+void WaveScopeUpdateChannel(WORD num);
+void WaveScopeDrawChannel(WORD num, BitmapT *bm, WORD x, WORD y);
 
 #endif
