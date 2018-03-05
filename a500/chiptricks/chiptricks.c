@@ -73,7 +73,7 @@ static ArtworkT *artwork;
 
 static struct {
   APTR data;
-  CopInsT *bgcol[10];
+  CopInsT *bgcol[LABEL_H];
 } module[MODULES];
 
 static WORD active = 0;
@@ -202,7 +202,7 @@ static void AhxStopPlayer(void) {
 }
 
 static void Init() {
-  cp = NewCopList(200 + MODULES * 10 * 5);
+  cp = NewCopList(200 + MODULES * LABEL_H * 4 + INFO_H * 2);
 
   CopInit(cp);
   CopSetupGfxSimple(cp, MODE_LORES, DEPTH, X(0), Y(0), WIDTH, HEIGHT);
@@ -210,17 +210,21 @@ static void Init() {
   CopSetupSprites(cp, sprptr);
   CopLoadPal(cp, screen->palette, 0);
   {
-    WORD y, k, i = 0;
+    WORD y;
 
     for (y = 0; y < SCROLL_Y; y++) {
-      if ((y == LABEL_Y + i * 10) && (i < MODULES)) {
-        for (k = 0; k < 10; k++) {
-          CopWaitSafe(cp, Y(y + k), X(0) / 2);
-          module[i].bgcol[k] = CopSetRGB(cp, COLOR, (i & 1) ? 0x311 : 0x411);
-          CopWaitSafe(cp, Y(y + k), X(160) / 2);
-          CopSetRGB(cp, COLOR, (i & 1) ? 0x311 : 0x411);
-        }
-        i++;
+      if (y >= LABEL_Y && y < LABEL_Y + MODULES * LABEL_H) {
+        WORD i = (y - LABEL_Y) / LABEL_H;
+        WORD k = (y - LABEL_Y) % LABEL_H;
+        CopWaitSafe(cp, Y(y), X(0) / 2);
+        module[i].bgcol[k] = CopSetRGB(cp, COLOR, (i & 1) ? 0x311 : 0x411);
+        CopWaitSafe(cp, Y(y), X(112) / 2);
+        CopSetRGB(cp, COLOR, (i & 1) ? 0x311 : 0x411);
+      }
+      if (y >= INFO_Y && y < INFO_Y + INFO_H) {
+        WORD i = (y - INFO_Y) / LABEL_H;
+        CopWaitSafe(cp, Y(y), X(160) / 2);
+        CopSetRGB(cp, COLOR, (i & 1) ? 0x311 : 0x411);
       }
     }
   }

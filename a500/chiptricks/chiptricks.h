@@ -10,6 +10,9 @@
 
 #define COLOR 8
 #define LABEL_Y 35
+#define LABEL_H 10
+#define INFO_Y 83
+#define INFO_H 80
 #define SCROLL_Y 241
 #define SCROLL_H 15
 
