@@ -20,8 +20,8 @@
 #include "ct-load.h"
 
 STRPTR __cwdpath = "chiptrick";
-LONG __chipmem = 250 * 1024;
-LONG __fastmem = 450 * 1024;
+LONG __chipmem = 410 * 1024;
+LONG __fastmem = 410 * 1024;
 
 static BitmapT *screen, *trkselbt[3];
 static FontT *small_font, *big_font;
